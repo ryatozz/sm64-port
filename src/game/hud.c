@@ -14,6 +14,12 @@
 #include "save_file.h"
 #include "print.h"
 
+// CTF Challenge
+extern s32 sCTFBowserDefeated;
+extern const u8 sCTFEncodedFlag[];
+extern s32 sCTFTimerStarted;
+extern s32 sCTFTimerFrames;
+#define CTF_TIME_LIMIT (30 * 30)
 /* @file hud.c
  * This file implements HUD rendering and power meter animations.
  * That includes stars, lives, coins, camera status, power meter, timer
@@ -418,6 +424,27 @@ void render_hud_camera_status(void) {
  * Render HUD strings using hudDisplayFlags with it's render functions,
  * excluding the cannon reticle which detects a camera preset for it.
  */
+void render_hud_ctf_timer(void) {
+    if (sCTFTimerStarted) {
+        s32 timeLeft = (CTF_TIME_LIMIT - sCTFTimerFrames) / 30;
+        if (timeLeft < 0) timeLeft = 0;
+        print_text_fmt_int(140, 40, "TIME %d", timeLeft);
+        if (sCTFBowserDefeated) {
+            char flag[26];
+            int i;
+            for (i = 0; i < 25; i++) {
+                flag[i] = sCTFEncodedFlag[i] ^ 0x42;
+            }
+            flag[25] = '\0';
+            print_text(50, 120, "GG WELL PLAYED");
+            print_text(30, 100, flag);
+        } else if (timeLeft == 0) {
+            print_text(80, 120, "TOO SLOW");
+        }
+    }
+}
+
+
 void render_hud(void) {
     s16 hudDisplayFlags;
 #ifdef VERSION_EU
@@ -476,4 +503,5 @@ void render_hud(void) {
             render_hud_timer();
         }
     }
+    render_hud_ctf_timer();
 }

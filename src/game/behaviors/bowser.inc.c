@@ -1,6 +1,19 @@
 /**
  * Behavior for Bowser and it's actions (Tail, Flame, Body)
  */
+// === CTF MB CHALLENGE ===
+s32 sCTFTimerStarted = 0;
+s32 sCTFTimerFrames = 0;
+#define CTF_TIME_LIMIT (30 * 30) // 30 secondes * 30 fps
+
+s32 sCTFBowserDefeated = 0;
+const u8 sCTFEncodedFlag[] = {
+    0x0F, 0x00, 0x39, 0x11, 0x72, 0x1D, 0x2E, 0x72,
+    0x2C, 0x25, 0x1D, 0x09, 0x73, 0x2C, 0x25, 0x76,
+    0x1D, 0x00, 0x72, 0x35, 0x31, 0x71, 0x30, 0x63, 0x3F
+};
+#define CTF_FLAG_LEN 25
+#define CTF_XOR_KEY 0x42
 
 // Bowser's Tail
 
@@ -1000,6 +1013,9 @@ void bowser_act_thrown(void) {
         o->oHealth--;
         if (o->oHealth <= 0) {
             o->oAction = BOWSER_ACT_DEAD;
+            if (sCTFTimerFrames <= CTF_TIME_LIMIT) {
+                sCTFBowserDefeated = 1;
+            }
         } else {
             o->oAction = BOWSER_ACT_HIT_MINE;
         }
@@ -1547,7 +1563,7 @@ s8 sBowserRainbowLight[] = { FALSE, FALSE, TRUE };
 /**
  * Set how much health Bowser has on each stage
  */
-s8 sBowserHealth[] = { 1, 1, 3 };
+s8 sBowserHealth[] = { 1, 1, 99 };
 
 /**
  * Update Bowser's actions when he's hands free
@@ -1651,9 +1667,33 @@ void bowser_thrown_dropped_update(void) {
 /**
  * Bowser's main loop
  */
+
+ /*
+ 
+ // === CTF MB CHALLENGE ===
+s32 sCTFTimerStarted = 0;
+s32 sCTFTimerFrames = 0;
+#define CTF_TIME_LIMIT (30 * 30) // 30 secondes * 30 fps
+
+s32 sCTFBowserDefeated = 0;
+static const u8 sCTFEncodedFlag[] = {
+    0x0F, 0x00, 0x39, 0x11, 0x72, 0x1D, 0x2E, 0x72,
+    0x2C, 0x25, 0x1D, 0x09, 0x73, 0x2C, 0x25, 0x76,
+    0x1D, 0x00, 0x72, 0x35, 0x31, 0x71, 0x30, 0x63, 0x3F
+};
+#define CTF_FLAG_LEN 25
+#define CTF_XOR_KEY 0x42
+*/
+
 void bhv_bowser_loop(void) {
     s16 angleToMario;  // AngleToMario from Bowser's perspective
     s16 angleToCentre; // AngleToCentre from Bowser's perspective
+    // CTF Timer
+    if (!sCTFTimerStarted) {
+        sCTFTimerStarted = 1;
+        sCTFTimerFrames = 0;
+    }
+    sCTFTimerFrames++;
 
     // Set distance/angle values
     o->oBowserDistToCentre = sqrtf(o->oPosX * o->oPosX + o->oPosZ * o->oPosZ);
@@ -1715,6 +1755,10 @@ void bhv_bowser_loop(void) {
                 }
             }
         }
+    }
+    // CTF: Time's up
+    if (sCTFTimerStarted && sCTFTimerFrames > CTF_TIME_LIMIT && o->oAction != BOWSER_ACT_DEAD) {
+        gMarioState->health = 0;
     }
 }
 
