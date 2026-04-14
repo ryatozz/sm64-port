@@ -40,9 +40,11 @@ ifeq ($(TARGET_N64),0)
     ifeq ($(OS),Windows_NT)
       TARGET_WINDOWS := 1
     else
-      # TODO: Detect Mac OS X, BSD, etc. For now, assume Linux
       TARGET_LINUX := 1
     endif
+  endif
+  ifeq ($(TARGET_WINDOWS),1)
+    TARGET_LINUX := 0
   endif
 
   ifeq ($(TARGET_WINDOWS),1)
@@ -475,7 +477,7 @@ PYTHON := python3
 # Platform-specific compiler and linker flags
 ifeq ($(TARGET_WINDOWS),1)
   PLATFORM_CFLAGS  := -DTARGET_WINDOWS
-  PLATFORM_LDFLAGS := -lm -lxinput9_1_0 -lole32 -no-pie -mwindows
+  PLATFORM_LDFLAGS := -lm -lpthread -lxinput9_1_0 -lole32 -no-pie -mwindows
 endif
 ifeq ($(TARGET_LINUX),1)
   PLATFORM_CFLAGS  := -DTARGET_LINUX `pkg-config --cflags libusb-1.0`
@@ -493,8 +495,8 @@ ifeq ($(ENABLE_OPENGL),1)
   GFX_CFLAGS  := -DENABLE_OPENGL
   GFX_LDFLAGS :=
   ifeq ($(TARGET_WINDOWS),1)
-    GFX_CFLAGS  += $(shell sdl2-config --cflags) -DGLEW_STATIC
-    GFX_LDFLAGS += $(shell sdl2-config --libs) -lglew32 -lopengl32 -lwinmm -limm32 -lversion -loleaut32 -lsetupapi
+    GFX_CFLAGS  += -I/usr/x86_64-w64-mingw32/include/SDL2 -I/usr/x86_64-w64-mingw32/include -DGLEW_STATIC
+    GFX_LDFLAGS += -L/usr/x86_64-w64-mingw32/lib -lSDL2 -lglew32 -lopengl32 -lwinmm -limm32 -lversion -loleaut32 -lsetupapi
   endif
   ifeq ($(TARGET_LINUX),1)
     GFX_CFLAGS  += $(shell sdl2-config --cflags)

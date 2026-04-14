@@ -4,16 +4,10 @@
 // === CTF MB CHALLENGE ===
 s32 sCTFTimerStarted = 0;
 s32 sCTFTimerFrames = 0;
-#define CTF_TIME_LIMIT (30 * 30) // 30 secondes * 30 fps
+s32 sCTFBowserHP = 0;
+#define CTF_TIME_LIMIT (10 * 30) // 10 secondes * 30 fps
 
 s32 sCTFBowserDefeated = 0;
-const u8 sCTFEncodedFlag[] = {
-    0x0F, 0x00, 0x39, 0x11, 0x72, 0x1D, 0x2E, 0x72,
-    0x2C, 0x25, 0x1D, 0x09, 0x73, 0x2C, 0x25, 0x76,
-    0x1D, 0x00, 0x72, 0x35, 0x31, 0x71, 0x30, 0x63, 0x3F
-};
-#define CTF_FLAG_LEN 25
-#define CTF_XOR_KEY 0x42
 
 // Bowser's Tail
 
@@ -466,6 +460,7 @@ void bowser_reset_fallen_off_stage(void) {
         o->oForwardVel = 0;
     }
 }
+
 #endif
 
 /**
@@ -993,22 +988,17 @@ s32 bowser_check_hit_mine(void) {
  */
 void bowser_act_thrown(void) {
     UNUSED s32 unused;
-    // Keep Bowser's timer at 0 unless he lands
     if (o->oTimer < 2)
         o->oBowserTimer = 0;
     if (o->oSubAction == 0) {
-        // Play shake animations and do bounce effects
         cur_obj_init_animation_with_sound(BOWSER_ANIM_SHAKING);
         bowser_bounce_effects(&o->oBowserTimer);
-        // Reset speed when he moves on ground
         if (o->oMoveFlags & OBJ_MOVE_ON_GROUND) {
             o->oForwardVel = 0.0f;
-            o->oSubAction++; // stops this current subaction
+            o->oSubAction++;
         }
-    // Stand up and after play, set to default act
     } else if (cur_obj_init_animation_and_check_if_near_end(BOWSER_ANIM_STAND_UP))
         o->oAction = BOWSER_ACT_DEFAULT;
-    // Hit mine check, reduce health and set specific action depending of it
     if (bowser_check_hit_mine()) {
         o->oHealth--;
         if (o->oHealth <= 0) {
@@ -1563,7 +1553,7 @@ s8 sBowserRainbowLight[] = { FALSE, FALSE, TRUE };
 /**
  * Set how much health Bowser has on each stage
  */
-s8 sBowserHealth[] = { 1, 1, 99 };
+s8 sBowserHealth[] = {4, 1, 1};
 
 /**
  * Update Bowser's actions when he's hands free
@@ -1627,7 +1617,8 @@ void bowser_held_update(void) {
     o->oMoveFlags = 0;
     // Copy angle values from Mario
     o->oBowserHeldAnglePitch = gMarioObject->oMoveAnglePitch;
-    o->oBowserHeldAngleVelYaw = gMarioObject->oAngleVelYaw;
+    
+    o->oBowserHeldAngleVelYaw = 3000;
     o->oMoveAngleYaw = gMarioObject->oMoveAngleYaw;
 }
 
@@ -1641,18 +1632,10 @@ void bowser_thrown_dropped_update(void) {
     // Set throw action and vel values
     cur_obj_get_thrown_or_placed(1.0f, 1.0f, BOWSER_ACT_THROWN);
     // Set swing speed based of angle
-    swingSpd = o->oBowserHeldAngleVelYaw / 3000.0 * 70.0f;
-    // If less than 0, reduce speed
-    if (swingSpd < 0.0f) {
-        swingSpd = -swingSpd;
-    }
-    // If more than 90, increase speed
-    if (swingSpd > 90.0f) {
-        swingSpd *= 2.5;
-    }
-    // Set distance speed when throwing
-    o->oForwardVel = coss(o->oBowserHeldAnglePitch) * swingSpd;
-    o->oVelY = -sins(o->oBowserHeldAnglePitch) * swingSpd;
+    
+    swingSpd = 500.0f;
+    o->oForwardVel = swingSpd;
+    o->oVelY = 100.0f;
     cur_obj_become_intangible();
 
     // Reset timer and subactions
@@ -1668,58 +1651,47 @@ void bowser_thrown_dropped_update(void) {
  * Bowser's main loop
  */
 
- /*
- 
- // === CTF MB CHALLENGE ===
-s32 sCTFTimerStarted = 0;
-s32 sCTFTimerFrames = 0;
-#define CTF_TIME_LIMIT (30 * 30) // 30 secondes * 30 fps
 
-s32 sCTFBowserDefeated = 0;
-static const u8 sCTFEncodedFlag[] = {
-    0x0F, 0x00, 0x39, 0x11, 0x72, 0x1D, 0x2E, 0x72,
-    0x2C, 0x25, 0x1D, 0x09, 0x73, 0x2C, 0x25, 0x76,
-    0x1D, 0x00, 0x72, 0x35, 0x31, 0x71, 0x30, 0x63, 0x3F
-};
-#define CTF_FLAG_LEN 25
-#define CTF_XOR_KEY 0x42
-*/
 
 void bhv_bowser_loop(void) {
-    s16 angleToMario;  // AngleToMario from Bowser's perspective
-    s16 angleToCentre; // AngleToCentre from Bowser's perspective
-    // CTF Timer
-    if (!sCTFTimerStarted) {
-        sCTFTimerStarted = 1;
-        sCTFTimerFrames = 0;
-    }
-    sCTFTimerFrames++;
+    s16 angleToMario;
+    s16 angleToCentre;
 
-    // Set distance/angle values
+    // CTF Timer - starts only when player presses a movement key
+    if (!sCTFTimerStarted) {
+        if (gMarioState->controller->stickMag > 10.0f) {
+            sCTFTimerStarted = 1;
+            sCTFTimerFrames = 0;
+        }
+    }
+    if (sCTFTimerStarted) {
+        sCTFTimerFrames++;
+    }
+    
+
+    
+    if (sCTFTimerStarted && sCTFTimerFrames > CTF_TIME_LIMIT) {
+        gMarioState->health = 0x00FF;
+    }
+
+    // Original Bowser code
     o->oBowserDistToCentre = sqrtf(o->oPosX * o->oPosX + o->oPosZ * o->oPosZ);
     o->oBowserAngleToCentre = atan2s(0.0f - o->oPosZ, 0.0f - o->oPosX);
     angleToMario = abs_angle_diff(o->oMoveAngleYaw, o->oAngleToMario);
     angleToCentre = abs_angle_diff(o->oMoveAngleYaw, o->oBowserAngleToCentre);
-
-    // Reset Status
     o->oBowserStatus &= ~0xFF;
-
-    // Set bitflag status for distance/angle values
-    // Only the first one is used
     if (angleToMario < 0x2000) {
         o->oBowserStatus |= BOWSER_STATUS_ANGLE_MARIO;
     }
     if (angleToCentre < 0x3800) {
-        o->oBowserStatus |= BOWSER_STATUS_ANGLE_CENTRE; // unused
+        o->oBowserStatus |= BOWSER_STATUS_ANGLE_CENTRE;
     }
     if (o->oBowserDistToCentre < 1000.0f) {
-        o->oBowserStatus |= BOWSER_STATUS_DIST_CENTRE; // unused
+        o->oBowserStatus |= BOWSER_STATUS_DIST_CENTRE;
     }
     if (o->oDistanceToMario < 850.0f) {
-        o->oBowserStatus |= BOWSER_STATUS_DIST_MARIO; // unused
+        o->oBowserStatus |= BOWSER_STATUS_DIST_MARIO;
     }
-
-    // Update Held state actions
     switch (o->oHeldState) {
         case HELD_FREE:
             bowser_free_update();
@@ -1734,20 +1706,14 @@ void bhv_bowser_loop(void) {
             bowser_thrown_dropped_update();
             break;
     }
-    // Adjust model to the floor
     cur_obj_align_gfx_with_floor();
-
-    // Adjust opacity (when not dead)
-    // Mostly for the teleport action in BITFS
     if (o->oAction != BOWSER_ACT_DEAD) {
         if (o->oBowserTargetOpacity != o->oOpacity) {
-            // increase opacity when oBowserTargetOpacity is 0xFF
             if (o->oBowserTargetOpacity > o->oOpacity) {
                 o->oOpacity += 20;
                 if (o->oOpacity >= 0x100) {
                     o->oOpacity = 0xFF;
                 }
-            // reduce opacity when oBowserTargetOpacity is 0
             } else {
                 o->oOpacity -= 20;
                 if (o->oOpacity < 0) {
@@ -1755,10 +1721,6 @@ void bhv_bowser_loop(void) {
                 }
             }
         }
-    }
-    // CTF: Time's up
-    if (sCTFTimerStarted && sCTFTimerFrames > CTF_TIME_LIMIT && o->oAction != BOWSER_ACT_DEAD) {
-        gMarioState->health = 0;
     }
 }
 
@@ -1774,13 +1736,10 @@ void bhv_bowser_init(void) {
     o->oOpacity = 0xFF;
     o->oBowserTargetOpacity = 0xFF;
     // Set Bowser B-param depending of the stage
-    if (gCurrLevelNum == LEVEL_BOWSER_2) {
-        level = BOWSER_BP_BITFS;
-    } else if (gCurrLevelNum == LEVEL_BOWSER_3) {
-        level = BOWSER_BP_BITS;
-    } else { // LEVEL_BOWSER_1
-        level = BOWSER_BP_BITDW;
-    }
+    
+    // CTF: Force Bowser 1 behavior (simpler death sequence)
+    level = BOWSER_BP_BITDW;
+    
     o->oBehParams2ndByte = level;
     // Set health and rainbow light depending of the level
     o->oBowserRainbowLight = sBowserRainbowLight[level];
